@@ -1,0 +1,56 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# next.js build output
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local env files
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# logs
+logs
+*.log
+
+# coverage
+/coverage
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+
+# temporary files
+*.tmp
+*.temp
+
+# lock files (optional, pilih salah satu sesuai package manager)
+# biasanya tetap di-commit, jadi jangan ignore kalau tim
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

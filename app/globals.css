@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 5.5%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 10.2%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 10.2%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 70 100% 89%;
+    --primary-foreground: 78 100% 15%;
+    --secondary: 116 75% 78%;
+    --secondary-foreground: 133 96% 19%;
+    --muted: 0 0% 12.5%;
+    --muted-foreground: 0 2% 67%;
+    --accent: 71 100% 49%;
+    --accent-foreground: 78 100% 15%;
+    --destructive: 11 100% 66%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 1% 28%;
+    --input: 0 1% 28%;
+    --ring: 71 100% 49%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-pitch-950 text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-crushed {
+    letter-spacing: -0.02em;
+  }
+
+  .glass-nav {
+    backdrop-filter: blur(12px);
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reveal-up {
+    animation: reveal-up 0.8s ease-out both;
+  }
+
+  .reveal-delay-1 {
+    animation-delay: 0.12s;
+  }
+
+  .reveal-delay-2 {
+    animation-delay: 0.24s;
+  }
+
+  .reveal-delay-3 {
+    animation-delay: 0.36s;
+  }
+
+  .reveal-delay-4 {
+    animation-delay: 0.48s;
+  }
+
+  .surface-glow {
+    box-shadow: 0 24px 64px rgba(157, 241, 151, 0.08);
+  }
+
+  .float-slow {
+    animation: float-slow 5.5s ease-in-out infinite;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal-up,
+  .float-slow,
+  .animate-ping {
+    animation: none !important;
+  }
+}
