@@ -1,4 +1,5 @@
 import { MIDTRANS_PENDING_TIMEOUT_MINUTES } from "@/lib/midtrans";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type FonnteResponse = {
   status?: boolean;
@@ -12,24 +13,23 @@ function getFonnteToken() {
   return process.env.FONNTE_TOKEN ?? "";
 }
 
-function getAppBaseUrl() {
-  const explicitBaseUrl = process.env.APP_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
-
-  if (explicitBaseUrl) {
-    return explicitBaseUrl.replace(/\/+$/, "");
-  }
-
-  const vercelUrl = process.env.VERCEL_URL;
-
-  if (vercelUrl) {
-    return `https://${vercelUrl.replace(/\/+$/, "")}`;
-  }
-
-  return "";
-}
-
 export function isFonnteConfigured() {
   return Boolean(getFonnteToken());
+}
+
+async function getSiteName() {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data } = await supabase
+      .from("app_settings")
+      .select("venue_name")
+      .eq("id", 1)
+      .maybeSingle();
+
+    return data?.venue_name?.trim() || "Kinetic Turf";
+  } catch {
+    return "Kinetic Turf";
+  }
 }
 
 export function normalizePhoneForWhatsApp(phone: string) {
@@ -65,6 +65,7 @@ export async function sendPaymentLinkWhatsApp(input: {
   }
 
   const normalizedPhone = normalizePhoneForWhatsApp(input.contactPhone);
+  const siteName = await getSiteName();
 
   if (!normalizedPhone) {
     throw new Error("Invalid contact phone for Fonnte.");
@@ -74,6 +75,7 @@ export async function sendPaymentLinkWhatsApp(input: {
     target: normalizedPhone,
     message: [
       `Halo ${input.contactName},`,
+      `**${siteName}**`,
       "",
       "Booking berhasil dibuat.",
       `Kode booking: ${input.orderId}`,
@@ -140,6 +142,7 @@ export async function sendPaymentSuccessWhatsApp(input: {
   }
 
   const normalizedPhone = normalizePhoneForWhatsApp(input.contactPhone);
+  const siteName = await getSiteName();
 
   if (!normalizedPhone) {
     throw new Error("Invalid contact phone for Fonnte.");
@@ -149,6 +152,7 @@ export async function sendPaymentSuccessWhatsApp(input: {
     target: normalizedPhone,
     message: [
       `Halo ${input.contactName},`,
+      `**${siteName}**`,
       "",
       "Pembayaran booking Anda berhasil diterima.",
       `Kode booking: ${input.orderId}`,
