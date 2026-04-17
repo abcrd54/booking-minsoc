@@ -1,7 +1,64 @@
 import { revalidatePath } from "next/cache";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getMidtransTransactionStatus, type MidtransStatusResponse, verifyMidtransSignature } from "@/lib/midtrans";
+import {
+  expireMidtransTransaction,
+  getMidtransTransactionStatus,
+  MIDTRANS_PENDING_TIMEOUT_MINUTES,
+  type MidtransStatusResponse,
+  verifyMidtransSignature,
+} from "@/lib/midtrans";
+
+function getPendingTimeoutThreshold() {
+  return new Date(Date.now() - MIDTRANS_PENDING_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+}
+
+function isPendingBookingTimedOut(createdAt: string) {
+  return new Date(createdAt).getTime() <= Date.now() - MIDTRANS_PENDING_TIMEOUT_MINUTES * 60 * 1000;
+}
+
+async function expirePendingBookingRecord(input: {
+  bookingId: string;
+  slotId: string;
+  orderId?: string | null;
+  reason: string;
+}) {
+  const supabase = createSupabaseAdminClient();
+
+  if (input.orderId) {
+    try {
+      await expireMidtransTransaction(input.orderId);
+    } catch {
+      // Midtrans may already consider the transaction expired or unavailable.
+    }
+  }
+
+  await supabase
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      payment_status: "kedaluwarsa",
+      admin_notes: input.reason,
+    })
+    .eq("id", input.bookingId);
+
+  await supabase
+    .from("schedule_slots")
+    .update({
+      status: "available",
+      notes: null,
+    })
+    .eq("id", input.slotId);
+}
+
+function revalidateBookingSurfaces() {
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/pembayaran");
+  revalidatePath("/payment/finish");
+  revalidatePath("/payment/unfinish");
+  revalidatePath("/payment/error");
+}
 
 function mapMidtransStatusToBooking(payload: MidtransStatusResponse) {
   const transactionStatus = payload.transaction_status ?? "";
@@ -73,6 +130,30 @@ export async function applyMidtransStatusToBooking(payload: MidtransStatusRespon
 
   const supabase = createSupabaseAdminClient();
   const update = mapMidtransStatusToBooking(payload);
+  const { data: currentBooking, error: currentBookingError } = await supabase
+    .from("bookings")
+    .select("id, slot_id, created_at, status, payment_status")
+    .eq("payment_code", payload.order_id)
+    .single();
+
+  if (currentBookingError || !currentBooking) {
+    throw new Error("booking_not_found");
+  }
+
+  if (
+    currentBooking.status === "pending" &&
+    currentBooking.payment_status === "menunggu_verifikasi" &&
+    isPendingBookingTimedOut(currentBooking.created_at)
+  ) {
+    await expirePendingBookingRecord({
+      bookingId: currentBooking.id,
+      slotId: currentBooking.slot_id,
+      orderId: payload.order_id,
+      reason: `Pembayaran melewati batas ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit`,
+    });
+    revalidateBookingSurfaces();
+    return;
+  }
 
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
@@ -82,7 +163,7 @@ export async function applyMidtransStatusToBooking(payload: MidtransStatusRespon
       payment_method: payload.payment_type ?? "midtrans_snap",
       admin_notes: update.adminNotes,
     })
-    .eq("payment_code", payload.order_id)
+    .eq("id", currentBooking.id)
     .select("slot_id")
     .single();
 
@@ -103,18 +184,61 @@ export async function applyMidtransStatusToBooking(payload: MidtransStatusRespon
     })
     .eq("id", booking.slot_id);
 
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/pembayaran");
-  revalidatePath("/payment/finish");
-  revalidatePath("/payment/unfinish");
-  revalidatePath("/payment/error");
+  revalidateBookingSurfaces();
 }
 
 export async function syncBookingFromMidtrans(orderId: string) {
   const status = await getMidtransTransactionStatus(orderId);
   await applyMidtransStatusToBooking(status);
   return status;
+}
+
+export async function cancelPendingMidtransBooking(bookingId: string, orderId: string) {
+  const supabase = createSupabaseAdminClient();
+  const { data: booking, error } = await supabase
+    .from("bookings")
+    .select("id, slot_id, status, payment_status, payment_method, payment_code")
+    .eq("id", bookingId)
+    .eq("payment_code", orderId)
+    .eq("payment_method", "midtrans_snap")
+    .maybeSingle();
+
+  if (error || !booking) {
+    throw new Error("booking_not_found");
+  }
+
+  if (booking.status !== "pending" || booking.payment_status !== "menunggu_verifikasi") {
+    throw new Error("booking_is_not_pending");
+  }
+
+  try {
+    await expireMidtransTransaction(orderId);
+  } catch {
+    // Ignore Midtrans expire errors during manual cancellation.
+  }
+
+  const { error: bookingUpdateError } = await supabase
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      payment_status: "ditolak",
+      admin_notes: "Dibatalkan customer sebelum pembayaran selesai",
+    })
+    .eq("id", bookingId);
+
+  if (bookingUpdateError) {
+    throw new Error("failed_to_cancel_booking");
+  }
+
+  await supabase
+    .from("schedule_slots")
+    .update({
+      status: "available",
+      notes: null,
+    })
+    .eq("id", booking.slot_id);
+
+  revalidateBookingSurfaces();
 }
 
 export async function syncPendingMidtransBookings() {
@@ -141,4 +265,64 @@ export async function syncPendingMidtransBookings() {
         }
       }),
   );
+}
+
+export async function expireStalePendingMidtransBookings() {
+  const supabase = createSupabaseAdminClient();
+  const { data: staleBookings } = await supabase
+    .from("bookings")
+    .select("id, slot_id, payment_code")
+    .eq("payment_method", "midtrans_snap")
+    .eq("status", "pending")
+    .eq("payment_status", "menunggu_verifikasi")
+    .lte("created_at", getPendingTimeoutThreshold());
+
+  if (!staleBookings?.length) {
+    return 0;
+  }
+
+  await Promise.all(
+    staleBookings.map((booking) =>
+      expirePendingBookingRecord({
+        bookingId: booking.id,
+        slotId: booking.slot_id,
+        orderId: booking.payment_code,
+        reason: `Pembayaran melewati batas ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit`,
+      }),
+    ),
+  );
+
+  revalidateBookingSurfaces();
+
+  return staleBookings.length;
+}
+
+export async function expirePendingMidtransBooking(bookingId: string, orderId: string) {
+  const supabase = createSupabaseAdminClient();
+  const { data: booking, error } = await supabase
+    .from("bookings")
+    .select("id, slot_id, payment_code, status, payment_status")
+    .eq("id", bookingId)
+    .eq("payment_code", orderId)
+    .eq("payment_method", "midtrans_snap")
+    .maybeSingle();
+
+  if (error || !booking) {
+    throw new Error("booking_not_found");
+  }
+
+  if (booking.status !== "pending" || booking.payment_status !== "menunggu_verifikasi") {
+    return false;
+  }
+
+  await expirePendingBookingRecord({
+    bookingId: booking.id,
+    slotId: booking.slot_id,
+    orderId: booking.payment_code,
+    reason: `Pembayaran melewati batas ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit`,
+  });
+
+  revalidateBookingSurfaces();
+
+  return true;
 }

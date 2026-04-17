@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+export const MIDTRANS_PENDING_TIMEOUT_MINUTES = 10;
+
 type MidtransTransactionInput = {
   orderId: string;
   grossAmount: number;
@@ -14,6 +16,7 @@ type MidtransTransactionInput = {
     quantity: number;
     name: string;
   }>;
+  startTime?: Date;
 };
 
 export type MidtransStatusResponse = {
@@ -55,6 +58,9 @@ function getMidtransServerKey() {
 export async function createMidtransSnapTransaction(input: MidtransTransactionInput) {
   const serverKey = getMidtransServerKey();
   const baseUrl = getMidtransBaseUrl();
+  const startTime = (input.startTime ?? new Date())
+    .toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" })
+    .replace(" ", " ") + " +0700";
 
   const response = await fetch(`${baseUrl}/snap/v1/transactions`, {
     method: "POST",
@@ -78,6 +84,15 @@ export async function createMidtransSnapTransaction(input: MidtransTransactionIn
         },
       },
       item_details: input.itemDetails,
+      expiry: {
+        start_time: startTime,
+        unit: "minute",
+        duration: MIDTRANS_PENDING_TIMEOUT_MINUTES,
+      },
+      page_expiry: {
+        duration: MIDTRANS_PENDING_TIMEOUT_MINUTES,
+        unit: "minute",
+      },
     }),
     cache: "no-store",
   });
@@ -114,6 +129,31 @@ export async function getMidtransTransactionStatus(orderId: string) {
 
   if (!response.ok) {
     throw new Error(payload.status_code || "gagal_mengambil_status_midtrans");
+  }
+
+  return payload;
+}
+
+export async function expireMidtransTransaction(orderId: string) {
+  const serverKey = getMidtransServerKey();
+  const baseUrl = process.env.MIDTRANS_IS_PRODUCTION === "true"
+    ? "https://api.midtrans.com"
+    : "https://api.sandbox.midtrans.com";
+
+  const response = await fetch(`${baseUrl}/v2/${encodeURIComponent(orderId)}/expire`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}`,
+    },
+    cache: "no-store",
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.status_message || payload.status_code || "gagal_expire_transaksi_midtrans");
   }
 
   return payload;

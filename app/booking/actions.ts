@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createMidtransSnapTransaction } from "@/lib/midtrans";
+import { isFonnteConfigured, sendPaymentLinkWhatsApp } from "@/lib/fonnte";
 
 function generateOrderId() {
   return `KT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -153,6 +154,38 @@ export async function createBookingAction(formData: FormData) {
 
         if (slotUpdateError) {
           redirect(`/?error=${encodeURIComponent(slotUpdateError.message)}#pricing`);
+        }
+      }
+
+      if (isFonnteConfigured()) {
+        const slotDateLabel = new Intl.DateTimeFormat("id-ID", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "Asia/Jakarta",
+        }).format(new Date(startAt));
+        const slotEndLabel = new Intl.DateTimeFormat("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "Asia/Jakarta",
+        }).format(new Date(endAt));
+
+        try {
+          await sendPaymentLinkWhatsApp({
+            bookingId: booking.id,
+            orderId: paymentCode,
+            contactName,
+            contactPhone,
+            amount: basePrice,
+            slotLabel: `${pitchName} | ${slotDateLabel} - ${slotEndLabel}`,
+          });
+        } catch (fonnteError) {
+          console.error("Failed to send WhatsApp payment link via Fonnte:", fonnteError);
         }
       }
 

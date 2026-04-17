@@ -2,10 +2,12 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 import { MidtransSnapClient } from "@/app/pembayaran/midtrans-snap-client";
+import { PaymentCountdown } from "@/app/pembayaran/payment-countdown";
+import { PaymentReminderSync } from "@/app/pembayaran/payment-reminder-sync";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getMidtransClientKey } from "@/lib/midtrans";
-import { syncBookingFromMidtrans } from "@/lib/midtrans-booking";
+import { getMidtransClientKey, MIDTRANS_PENDING_TIMEOUT_MINUTES } from "@/lib/midtrans";
+import { expireStalePendingMidtransBookings, syncBookingFromMidtrans } from "@/lib/midtrans-booking";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +41,10 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
   const supabase = createSupabaseAdminClient();
   const clientKey = getMidtransClientKey();
   const isProduction = process.env.MIDTRANS_IS_PRODUCTION === "true";
+  await expireStalePendingMidtransBookings();
   let { data: booking } = await supabase
     .from("bookings")
-    .select("id, team_name, contact_name, payment_code, transfer_amount, payment_status, payment_token, payment_method, status, schedule_slots(pitch_name, start_at, end_at, price)")
+    .select("id, team_name, contact_name, payment_code, transfer_amount, payment_status, payment_token, payment_method, status, created_at, schedule_slots(pitch_name, start_at, end_at, price)")
     .eq("id", bookingId)
     .maybeSingle();
 
@@ -50,7 +53,7 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
       await syncBookingFromMidtrans(booking.payment_code);
       const refreshed = await supabase
         .from("bookings")
-        .select("id, team_name, contact_name, payment_code, transfer_amount, payment_status, payment_token, payment_method, status, schedule_slots(pitch_name, start_at, end_at, price)")
+        .select("id, team_name, contact_name, payment_code, transfer_amount, payment_status, payment_token, payment_method, status, created_at, schedule_slots(pitch_name, start_at, end_at, price)")
         .eq("id", bookingId)
         .maybeSingle();
 
@@ -98,9 +101,20 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
         timeZone: "Asia/Jakarta",
       }).format(new Date(slot.end_at))
     : "-";
+  const reminderSlotLabel = `${slotLabel} - ${endTime}`;
 
   return (
     <main className="min-h-screen bg-pitch-950 px-6 py-16 text-foreground">
+      <PaymentReminderSync
+        bookingId={booking.id}
+        orderId={booking.payment_code ?? ""}
+        contactName={booking.contact_name}
+        slotLabel={reminderSlotLabel}
+        amount={Number(booking.transfer_amount ?? slot?.price ?? 0)}
+        paymentStatus={booking.payment_status}
+        bookingStatus={booking.status}
+        updatedAt={new Date().toISOString()}
+      />
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-lime-300/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.24em] text-lime-300">
@@ -156,12 +170,24 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
               <div className="space-y-3 text-sm leading-7 text-mist-300">
                 <p>1. Klik tombol pembayaran untuk membuka Midtrans Snap.</p>
                 <p>2. Pilih metode pembayaran yang tersedia di Midtrans.</p>
-                <p>3. Setelah pembayaran sukses, status booking akan diperbarui otomatis dari Midtrans.</p>
-                <p>4. Jika Anda testing di localhost, halaman ini juga akan mencoba sinkron otomatis saat dibuka kembali.</p>
+                <p>3. Selesaikan pembayaran maksimal dalam {MIDTRANS_PENDING_TIMEOUT_MINUTES} menit.</p>
+                <p>4. Setelah pembayaran sukses, status booking akan diperbarui otomatis dari Midtrans.</p>
               </div>
 
-              {booking.payment_token ? (
+              <PaymentCountdown
+                bookingId={booking.id}
+                orderId={booking.payment_code ?? ""}
+                createdAt={booking.created_at}
+                isActive={booking.status === "pending" && booking.payment_status === "menunggu_verifikasi"}
+                timeoutMinutes={MIDTRANS_PENDING_TIMEOUT_MINUTES}
+              />
+
+              {booking.payment_token && booking.status === "pending" && booking.payment_status === "menunggu_verifikasi" ? (
                 <MidtransSnapClient clientKey={clientKey} snapToken={booking.payment_token} isProduction={isProduction} />
+              ) : booking.payment_status === "kedaluwarsa" || booking.status === "cancelled" ? (
+                <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-100">
+                  Waktu pembayaran sudah lewat {MIDTRANS_PENDING_TIMEOUT_MINUTES} menit. Booking ini dianggap gagal dan slot sudah tersedia kembali.
+                </div>
               ) : (
                 <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-100">
                   Token pembayaran Midtrans belum tersedia.
@@ -171,9 +197,6 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
               <div className="flex flex-col gap-4 sm:flex-row">
                 <Link href="/" className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>
                   Kembali ke Beranda
-                </Link>
-                <Link href="/admin?section=booking" className={cn(buttonVariants(), "w-full")}>
-                  Lihat di Admin
                 </Link>
               </div>
             </CardContent>

@@ -8,6 +8,7 @@ import {
 
 import { LandingNav } from "@/components/landing-nav";
 import { BookingCalendarLive } from "@/components/booking-calendar-live";
+import { PendingPaymentReminder } from "@/components/pending-payment-reminder";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -21,6 +22,7 @@ import {
   type GalleryItem,
   type ScheduleSlotView,
 } from "@/lib/booking-data";
+import { expireStalePendingMidtransBookings } from "@/lib/midtrans-booking";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
@@ -70,6 +72,8 @@ async function getBookingCalendarData() {
   }
 
   try {
+    await expireStalePendingMidtransBookings();
+
     const supabase = await createSupabaseServerClient();
     const [settingsResult, slotsResult, galleryResult, facilitiesResult, faqResult] = await Promise.all([
       supabase
@@ -180,6 +184,7 @@ export default async function HomePage() {
 
   return (
     <main className="overflow-x-hidden bg-pitch-950 text-foreground">
+      <PendingPaymentReminder />
       <LandingNav
         brandName={bookingCalendarData.settings.venueName}
         brandLogoUrl={bookingCalendarData.settings.siteLogoUrl}
