@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isFonnteConfigured, sendPaymentSuccessWhatsApp } from "@/lib/fonnte";
 import {
   expireMidtransTransaction,
   getMidtransTransactionStatus,
@@ -58,6 +59,70 @@ function revalidateBookingSurfaces() {
   revalidatePath("/payment/finish");
   revalidatePath("/payment/unfinish");
   revalidatePath("/payment/error");
+}
+
+async function maybeSendPaymentSuccessWhatsApp(bookingId: string) {
+  if (!isFonnteConfigured()) {
+    return;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, payment_code, contact_name, contact_phone, transfer_amount, payment_notes, schedule_slots(start_at, end_at, pitch_name)")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (!booking?.payment_code || !booking.contact_name || !booking.contact_phone) {
+    return;
+  }
+
+  if (booking.payment_notes?.includes("wa_success_sent")) {
+    return;
+  }
+
+  const slot = Array.isArray(booking.schedule_slots) ? booking.schedule_slots[0] : booking.schedule_slots;
+  const slotLabel = slot?.start_at
+    ? `${slot.pitch_name ?? "Lapangan Utama"} | ${new Intl.DateTimeFormat("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(slot.start_at))} - ${new Intl.DateTimeFormat("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(slot.end_at))}`
+    : "Slot booking";
+
+  try {
+    await sendPaymentSuccessWhatsApp({
+      bookingId: booking.id,
+      orderId: booking.payment_code,
+      contactName: booking.contact_name,
+      contactPhone: booking.contact_phone,
+      slotLabel,
+      amount: booking.transfer_amount ?? 0,
+    });
+
+    const nextPaymentNotes = booking.payment_notes
+      ? `${booking.payment_notes}\nwa_success_sent`
+      : "wa_success_sent";
+
+    await supabase
+      .from("bookings")
+      .update({
+        payment_notes: nextPaymentNotes,
+      })
+      .eq("id", booking.id);
+  } catch (error) {
+    console.error("Failed to send payment success WhatsApp:", error);
+  }
 }
 
 function mapMidtransStatusToBooking(payload: MidtransStatusResponse) {
@@ -183,6 +248,10 @@ export async function applyMidtransStatusToBooking(payload: MidtransStatusRespon
             : null,
     })
     .eq("id", booking.slot_id);
+
+  if (update.bookingStatus === "confirmed" && update.paymentStatus === "terverifikasi") {
+    await maybeSendPaymentSuccessWhatsApp(currentBooking.id);
+  }
 
   revalidateBookingSurfaces();
 }

@@ -55,10 +55,32 @@ export function MidtransSnapClient({ bookingId, clientKey, snapToken, isProducti
 
             setIsOpening(true);
             window.snap.pay(snapToken, {
-              onSuccess: () => {
-                setIsOpening(false);
-                setMessage("Pembayaran berhasil. Mengarahkan ke beranda...");
-                router.replace(`/?success=${encodeURIComponent("pembayaran_berhasil")}`);
+              onSuccess: async (result) => {
+                setMessage("Pembayaran berhasil. Menyinkronkan status booking...");
+
+                const orderId =
+                  typeof result === "object" &&
+                  result !== null &&
+                  "order_id" in result &&
+                  typeof result.order_id === "string"
+                    ? result.order_id
+                    : undefined;
+
+                try {
+                  await fetch("/api/midtrans/success-sync", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      bookingId,
+                      orderId,
+                    }),
+                  });
+                } finally {
+                  setIsOpening(false);
+                  window.location.assign(`/?success=${encodeURIComponent("pembayaran_berhasil")}`);
+                }
               },
               onPending: () => {
                 setIsOpening(false);

@@ -124,3 +124,75 @@ export async function sendPaymentLinkWhatsApp(input: {
 
   return payload;
 }
+
+export async function sendPaymentSuccessWhatsApp(input: {
+  bookingId: string;
+  orderId: string;
+  contactName: string;
+  contactPhone: string;
+  slotLabel: string;
+  amount: number;
+}) {
+  const token = getFonnteToken();
+
+  if (!token) {
+    throw new Error("Missing FONNTE_TOKEN.");
+  }
+
+  const normalizedPhone = normalizePhoneForWhatsApp(input.contactPhone);
+
+  if (!normalizedPhone) {
+    throw new Error("Invalid contact phone for Fonnte.");
+  }
+
+  const body = new URLSearchParams({
+    target: normalizedPhone,
+    message: [
+      `Halo ${input.contactName},`,
+      "",
+      "Pembayaran booking Anda berhasil diterima.",
+      `Kode booking: ${input.orderId}`,
+      `Detail booking: ${input.slotLabel}`,
+      `Total pembayaran: Rp ${input.amount.toLocaleString("id-ID")}`,
+      "",
+      "Booking Anda sudah terkonfirmasi. Sampai jumpa di lapangan.",
+    ].join("\n"),
+    countryCode: "62",
+    preview: "false",
+  });
+
+  const response = await fetch("https://api.fonnte.com/send", {
+    method: "POST",
+    headers: {
+      Authorization: token,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+  });
+
+  const payload = (await response.json()) as FonnteResponse;
+
+  if (!response.ok || payload.status === false) {
+    console.error("Fonnte payment success send failed", {
+      bookingId: input.bookingId,
+      orderId: input.orderId,
+      rawPhone: input.contactPhone,
+      normalizedPhone,
+      httpStatus: response.status,
+      payload,
+    });
+
+    throw new Error(payload.reason || payload.detail || "Failed to send WhatsApp payment success.");
+  }
+
+  console.info("Fonnte payment success send success", {
+    bookingId: input.bookingId,
+    orderId: input.orderId,
+    rawPhone: input.contactPhone,
+    normalizedPhone,
+    payload,
+  });
+
+  return payload;
+}
