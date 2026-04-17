@@ -12,6 +12,18 @@ function generateOrderId() {
   return `KT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
+function isDuplicateSlotBookingError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return (
+    message.includes("bookings_slot_id_key") ||
+    message.includes("bookings_slot_id_unique_idx") ||
+    message.includes("duplicate key value violates unique constraint")
+  );
+}
+
 export async function createBookingAction(formData: FormData) {
   const slotId = String(formData.get("slot_id") ?? "").trim();
   const slotLabel = String(formData.get("slot_label") ?? "").trim();
@@ -110,6 +122,15 @@ export async function createBookingAction(formData: FormData) {
       })
       .select("id")
       .single();
+
+    if (isDuplicateSlotBookingError(error?.message)) {
+      await supabase
+        .from("schedule_slots")
+        .update({ status: "pending", notes: "Menunggu pembayaran Midtrans" })
+        .eq("id", resolvedSlotId);
+
+      redirect("/?error=slot_sudah_tidak_tersedia#pricing");
+    }
 
     if (error || !booking) {
       redirect(`/?error=${encodeURIComponent(error?.message ?? "gagal_membuat_booking")}#pricing`);

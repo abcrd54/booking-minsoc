@@ -5,6 +5,7 @@ import { CalendarDays, MoonStar, SunMedium } from "lucide-react";
 
 import { createScheduleAction } from "@/app/admin/actions";
 import { buttonVariants } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { getSlotIsoRange, getSlotPrice, getSlotWindows } from "@/lib/slot-utils";
 import { cn } from "@/lib/utils";
 
@@ -358,9 +359,9 @@ export function AdminBookingCalendar({ initialDate, settings, slots, bookings }:
             className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 outline-none transition focus:border-lime-300/40"
           />
         </label>
-        <button type="submit" disabled={!selectedSlot} className={cn(buttonVariants(), "w-full")}>
+        <SubmitButton disabled={!selectedSlot} className="w-full" pendingText="Menyimpan jadwal...">
           Buat Pesanan Manual
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );

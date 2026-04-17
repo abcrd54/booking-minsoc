@@ -7,6 +7,7 @@ import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { syncPendingMidtransBookings } from "@/lib/midtrans-booking";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SubmitButton } from "@/components/ui/submit-button";
 import {
   fallbackFacilityItems,
   fallbackFaqItems,
@@ -284,10 +285,10 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
               Kembali ke Landing
             </Link>
             <form action={logoutAction}>
-              <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>
+              <SubmitButton variant="secondary" className="w-full" pendingText="Keluar...">
                 <LogOut className="h-4 w-4" />
                 Logout
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </aside>
@@ -525,9 +526,9 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                       <div className="text-sm text-mist-300">Belum ada favicon.</div>
                     )}
                   </div>
-                  <button type="submit" className={cn(buttonVariants(), "lg:col-span-2")}>
+                  <SubmitButton className="lg:col-span-2" pendingText="Menyimpan setelan...">
                     Simpan Setelan Situs
-                  </button>
+                  </SubmitButton>
                 </form>
               </CardContent>
             </Card>
@@ -610,15 +611,15 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                           defaultValue={item.sortOrder}
                           className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 outline-none transition focus:border-lime-300/40"
                         />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>
+                        <SubmitButton variant="secondary" className="w-full" pendingText="Menyimpan FAQ...">
                           Simpan FAQ
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={deleteFaqItemAction}>
                         <input type="hidden" name="id" value={item.id} />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full border-red-400/30 text-red-200 hover:bg-red-400/10")}>
+                        <SubmitButton variant="secondary" className="w-full border-red-400/30 text-red-200 hover:bg-red-400/10" pendingText="Menghapus FAQ...">
                           Hapus FAQ
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ))}
@@ -651,9 +652,9 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                         className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 outline-none transition focus:border-lime-300/40"
                       />
                     </label>
-                    <button type="submit" className={cn(buttonVariants(), "w-full")}>
+                    <SubmitButton className="w-full" pendingText="Menambahkan FAQ...">
                       Tambah FAQ
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </CardContent>
@@ -699,15 +700,15 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                           accept="image/*"
                           className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 text-sm"
                         />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>
+                        <SubmitButton variant="secondary" className="w-full" pendingText="Menyimpan galeri...">
                           Simpan Item Galeri
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={deleteGalleryItemAction}>
                         <input type="hidden" name="id" value={item.id} />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full border-red-400/30 text-red-200 hover:bg-red-400/10")}>
+                        <SubmitButton variant="secondary" className="w-full border-red-400/30 text-red-200 hover:bg-red-400/10" pendingText="Menghapus galeri...">
                           Hapus Item
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ))}
@@ -744,9 +745,9 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                         className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 text-sm"
                       />
                     </label>
-                    <button type="submit" className={cn(buttonVariants(), "w-full")}>
+                    <SubmitButton className="w-full" pendingText="Menambahkan galeri...">
                       Tambah Galeri
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </CardContent>
@@ -806,15 +807,15 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                           accept="image/*"
                           className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 text-sm"
                         />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>
+                        <SubmitButton variant="secondary" className="w-full" pendingText="Menyimpan fasilitas...">
                           Simpan Fasilitas
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={deleteFacilityItemAction}>
                         <input type="hidden" name="id" value={item.id} />
-                        <button type="submit" className={cn(buttonVariants({ variant: "secondary" }), "w-full border-red-400/30 text-red-200 hover:bg-red-400/10")}>
+                        <SubmitButton variant="secondary" className="w-full border-red-400/30 text-red-200 hover:bg-red-400/10" pendingText="Menghapus fasilitas...">
                           Hapus Fasilitas
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ))}
@@ -866,9 +867,9 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                         className="w-full rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-3 text-sm"
                       />
                     </label>
-                    <button type="submit" className={cn(buttonVariants(), "w-full")}>
+                    <SubmitButton className="w-full" pendingText="Menambahkan fasilitas...">
                       Tambah Fasilitas
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </CardContent>
@@ -941,9 +942,9 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
                                   <form action={rejectBookingAction}>
                                     <input type="hidden" name="booking_id" value={booking.id} />
                                     <input type="hidden" name="slot_id" value={booking.slot_id} />
-                                    <button type="submit" disabled={booking.status === "cancelled"} className={cn(buttonVariants({ variant: "secondary" }), "h-9 border-red-400/30 px-3 text-[10px] text-red-200 hover:bg-red-400/10")}>
+                                    <SubmitButton variant="secondary" disabled={booking.status === "cancelled"} className="h-9 border-red-400/30 px-3 text-[10px] text-red-200 hover:bg-red-400/10" pendingText="Membatalkan...">
                                       Batalkan
-                                    </button>
+                                    </SubmitButton>
                                   </form>
                                 </div>
                               </td>

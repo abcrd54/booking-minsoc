@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
 
+import { FlashToast } from "@/components/flash-toast";
+import { GlobalNavigationProgress } from "@/components/global-navigation-progress";
 import { fallbackSettings } from "@/lib/booking-data";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -107,6 +110,12 @@ export default function RootLayout({
         className={`${manrope.variable} ${spaceGrotesk.variable}`}
         suppressHydrationWarning
       >
+        <Suspense fallback={null}>
+          <GlobalNavigationProgress />
+        </Suspense>
+        <Suspense fallback={null}>
+          <FlashToast />
+        </Suspense>
         {children}
         <AnalyticsSlot />
       </body>

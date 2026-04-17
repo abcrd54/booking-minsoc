@@ -85,6 +85,30 @@
   .float-slow {
     animation: float-slow 5.5s ease-in-out infinite;
   }
+
+  .route-progress-shell {
+    height: 3px;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .route-progress-shell-active {
+    opacity: 1;
+  }
+
+  .route-progress-bar {
+    height: 100%;
+    width: 28%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(197,254,0,0.35), rgba(197,254,0,1), rgba(157,241,151,0.55));
+    box-shadow: 0 0 24px rgba(197, 254, 0, 0.45);
+    transform: translateX(-130%);
+  }
+
+  .route-progress-bar-active {
+    animation: route-progress-run 1.2s ease-in-out infinite;
+  }
 }
 
 @keyframes reveal-up {
@@ -110,6 +134,32 @@
   }
 }
 
+@keyframes route-progress-run {
+  0% {
+    transform: translateX(-130%);
+  }
+
+  55% {
+    transform: translateX(140%);
+  }
+
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -117,7 +167,8 @@
 
   .reveal-up,
   .float-slow,
-  .animate-ping {
+  .animate-ping,
+  .route-progress-bar-active {
     animation: none !important;
   }
 }

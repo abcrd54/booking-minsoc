@@ -3,6 +3,7 @@ import { LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -82,10 +83,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   {decodeURIComponent(params.error)}
                 </div>
               ) : null}
-              <button type="submit" className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+              <SubmitButton size="xl" className="w-full" pendingText="Memeriksa akun...">
                 <LockKeyhole className="h-4 w-4" />
                 Masuk Admin
-              </button>
+              </SubmitButton>
             </form>
           )}
 

@@ -6,6 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Info, MoonStar, SunMedium, X }
 import { createBookingAction } from "@/app/booking/actions";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SubmitButton } from "@/components/ui/submit-button";
 import type { BookingSettings, ScheduleSlotView } from "@/lib/booking-data";
 import { getSlotIsoRange, getSlotPrice, getSlotWindows } from "@/lib/slot-utils";
 import { cn } from "@/lib/utils";
@@ -460,7 +461,7 @@ export function BookingCalendarLive({ settings, slots }: BookingCalendarProps) {
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={() => setIsModalOpen(false)} className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>Batal</button>
-                <button type="submit" className={cn(buttonVariants(), "w-full")}>Lanjut ke Pembayaran</button>
+                <SubmitButton className="w-full" pendingText="Membuat booking...">Lanjut ke Pembayaran</SubmitButton>
               </div>
             </form>
           </div>
