@@ -2,15 +2,12 @@
 
 import { redirect } from "next/navigation";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createMidtransSnapTransaction } from "@/lib/midtrans";
 
-function generatePaymentCode() {
-  return `KT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
-function generateUniqueNumber() {
-  return Math.floor(100 + Math.random() * 900);
+function generateOrderId() {
+  return `KT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
 export async function createBookingAction(formData: FormData) {
@@ -28,13 +25,12 @@ export async function createBookingAction(formData: FormData) {
     redirect("/?error=data_booking_tidak_lengkap#pricing");
   }
 
-  const uniqueNumber = generateUniqueNumber();
-  const paymentCode = generatePaymentCode();
-  const transferAmount = basePrice + uniqueNumber;
+  const paymentCode = generateOrderId();
 
   if (hasSupabaseEnv) {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
     let resolvedSlotId = slotId;
+    let createdNewSlot = false;
     let shouldMarkExistingSlotBooked = false;
 
     if (!resolvedSlotId || resolvedSlotId.startsWith("virtual:")) {
@@ -50,7 +46,7 @@ export async function createBookingAction(formData: FormData) {
         redirect(`/?error=${encodeURIComponent(existingSlotError.message)}#pricing`);
       }
 
-      if (existingSlot?.status === "booked" || existingSlot?.status === "blocked") {
+      if (existingSlot?.status === "pending" || existingSlot?.status === "booked" || existingSlot?.status === "blocked") {
         redirect("/?error=slot_sudah_tidak_tersedia#pricing");
       }
 
@@ -65,8 +61,8 @@ export async function createBookingAction(formData: FormData) {
             start_at: startAt,
             end_at: endAt,
             price: basePrice,
-            status: "booked",
-            notes: null,
+            status: "pending",
+            notes: "Menunggu verifikasi admin",
           })
           .select("id")
           .single();
@@ -76,6 +72,7 @@ export async function createBookingAction(formData: FormData) {
         }
 
         resolvedSlotId = insertedSlot.id;
+        createdNewSlot = true;
       }
     } else {
       const { data: currentSlot, error: currentSlotError } = await supabase
@@ -88,46 +85,96 @@ export async function createBookingAction(formData: FormData) {
         redirect(`/?error=${encodeURIComponent(currentSlotError.message)}#pricing`);
       }
 
-      if (currentSlot?.status === "booked" || currentSlot?.status === "blocked") {
+      if (currentSlot?.status === "pending" || currentSlot?.status === "booked" || currentSlot?.status === "blocked") {
         redirect("/?error=slot_sudah_tidak_tersedia#pricing");
       }
 
       shouldMarkExistingSlotBooked = true;
     }
 
-    const { error } = await supabase.from("bookings").insert({
-      slot_id: resolvedSlotId,
-      team_name: contactName,
-      contact_name: contactName,
-      address,
-      contact_phone: contactPhone,
-      payment_code: paymentCode,
-      payment_unique_number: uniqueNumber,
-      transfer_amount: transferAmount,
-      payment_method: "transfer_manual",
-      payment_status: "menunggu_verifikasi",
-      status: "pending",
-    });
+    const { data: booking, error } = await supabase
+      .from("bookings")
+      .insert({
+        slot_id: resolvedSlotId,
+        team_name: contactName,
+        contact_name: contactName,
+        address,
+        contact_phone: contactPhone,
+        payment_code: paymentCode,
+        transfer_amount: basePrice,
+        payment_method: "midtrans_snap",
+        payment_status: "menunggu_verifikasi",
+        status: "pending",
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      redirect(`/?error=${encodeURIComponent(error.message)}#pricing`);
+    if (error || !booking) {
+      redirect(`/?error=${encodeURIComponent(error?.message ?? "gagal_membuat_booking")}#pricing`);
     }
 
-    if (shouldMarkExistingSlotBooked) {
-      const { error: slotUpdateError } = await supabase
-        .from("schedule_slots")
-        .update({ status: "booked" })
-        .eq("id", resolvedSlotId);
+    try {
+      const snap = await createMidtransSnapTransaction({
+        orderId: paymentCode,
+        grossAmount: basePrice,
+        customer: {
+          firstName: contactName,
+          phone: contactPhone,
+          address,
+        },
+        itemDetails: [
+          {
+            id: resolvedSlotId,
+            price: basePrice,
+            quantity: 1,
+            name: `${pitchName} ${slotLabel}`.slice(0, 50),
+          },
+        ],
+      });
 
-      if (slotUpdateError) {
-        redirect(`/?error=${encodeURIComponent(slotUpdateError.message)}#pricing`);
+      const { error: bookingUpdateError } = await supabase
+        .from("bookings")
+        .update({
+          payment_token: snap.token,
+          payment_redirect_url: snap.redirectUrl,
+        })
+        .eq("id", booking.id);
+
+      if (bookingUpdateError) {
+        redirect(`/?error=${encodeURIComponent(bookingUpdateError.message)}#pricing`);
       }
+
+      if (shouldMarkExistingSlotBooked) {
+        const { error: slotUpdateError } = await supabase
+          .from("schedule_slots")
+          .update({ status: "pending", notes: "Menunggu pembayaran Midtrans" })
+          .eq("id", resolvedSlotId);
+
+        if (slotUpdateError) {
+          redirect(`/?error=${encodeURIComponent(slotUpdateError.message)}#pricing`);
+        }
+      }
+    } catch (midtransError) {
+      await supabase.from("bookings").delete().eq("id", booking.id);
+
+      if (createdNewSlot) {
+        await supabase.from("schedule_slots").delete().eq("id", resolvedSlotId);
+      } else {
+        await supabase
+          .from("schedule_slots")
+          .update({ status: "available", notes: null })
+          .eq("id", resolvedSlotId);
+      }
+
+      redirect(
+        `/?error=${encodeURIComponent(
+          midtransError instanceof Error ? midtransError.message : "gagal_membuat_transaksi_midtrans",
+        )}#pricing`,
+      );
     }
+
+    redirect(`/pembayaran?booking=${encodeURIComponent(booking.id)}`);
   }
 
-  redirect(
-    `/pembayaran?kode=${encodeURIComponent(paymentCode)}&slot=${encodeURIComponent(slotLabel)}&lapangan=${encodeURIComponent(
-      pitchName,
-    )}&nama=${encodeURIComponent(contactName)}&nominal=${transferAmount}`,
-  );
+  redirect("/?error=konfigurasi_supabase_tidak_ditemukan#pricing");
 }

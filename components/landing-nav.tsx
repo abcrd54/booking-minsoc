@@ -12,10 +12,11 @@ type NavItem = {
 
 type LandingNavProps = {
   brandName: string,
+  brandLogoUrl?: string | null,
   items: NavItem[];
 };
 
-export function LandingNav({ brandName, items }: LandingNavProps) {
+export function LandingNav({ brandName, brandLogoUrl, items }: LandingNavProps) {
   const [activeHref, setActiveHref] = useState(items[0]?.href ?? "#home");
 
   useEffect(() => {
@@ -63,7 +64,15 @@ export function LandingNav({ brandName, items }: LandingNavProps) {
             href="/"
             className="shrink-0 text-center font-headline text-xl font-black italic tracking-tight text-lime-300 md:text-2xl"
           >
-            {brandName.toUpperCase()}
+            {brandLogoUrl ? (
+              <img
+                src={brandLogoUrl}
+                alt={brandName}
+                className="h-12 w-auto max-w-[180px] object-contain md:h-14 md:max-w-[220px]"
+              />
+            ) : (
+              brandName.toUpperCase()
+            )}
           </Link>
         </div>
 

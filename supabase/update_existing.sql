@@ -23,6 +23,18 @@ end $$;
 
 do $$
 begin
+  if not exists (
+    select 1
+    from pg_enum
+    where enumtypid = 'public.slot_status'::regtype
+      and enumlabel = 'pending'
+  ) then
+    alter type public.slot_status add value 'pending' before 'booked';
+  end if;
+end $$;
+
+do $$
+begin
   if not exists (select 1 from pg_type where typname = 'booking_status') then
     create type public.booking_status as enum ('pending', 'confirmed', 'cancelled', 'rescheduled');
   end if;
@@ -71,6 +83,15 @@ create table if not exists public.facility_items (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.faq_items (
+  id uuid primary key default gen_random_uuid(),
+  question text not null,
+  answer text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.schedule_slots (
   id uuid primary key default gen_random_uuid(),
   pitch_name text not null default 'Lapangan Utama',
@@ -111,6 +132,12 @@ alter table public.app_settings add column if not exists default_price integer n
 alter table public.app_settings add column if not exists prime_start_time text not null default '17:00';
 alter table public.app_settings add column if not exists prime_end_time text not null default '22:00';
 alter table public.app_settings add column if not exists prime_price integer not null default 450000;
+alter table public.app_settings add column if not exists site_logo_url text;
+alter table public.app_settings add column if not exists favicon_url text;
+alter table public.app_settings add column if not exists seo_title text;
+alter table public.app_settings add column if not exists seo_description text;
+alter table public.app_settings add column if not exists seo_keywords text;
+alter table public.app_settings add column if not exists google_analytics_id text;
 alter table public.app_settings alter column venue_name set default 'Kinetic Turf';
 alter table public.app_settings alter column open_time set default '09:00';
 alter table public.app_settings alter column close_time set default '24:00';
@@ -130,6 +157,8 @@ alter table public.bookings add column if not exists payment_unique_number integ
 alter table public.bookings add column if not exists transfer_amount integer;
 alter table public.bookings add column if not exists payment_method text;
 alter table public.bookings add column if not exists payment_status public.payment_status not null default 'menunggu_verifikasi';
+alter table public.bookings add column if not exists payment_token text;
+alter table public.bookings add column if not exists payment_redirect_url text;
 
 create unique index if not exists schedule_slots_unique_window_idx
 on public.schedule_slots (pitch_name, start_at, end_at);
@@ -148,6 +177,7 @@ create index if not exists bookings_payment_status_idx on public.bookings (payme
 alter table public.app_settings enable row level security;
 alter table public.site_gallery enable row level security;
 alter table public.facility_items enable row level security;
+alter table public.faq_items enable row level security;
 alter table public.schedule_slots enable row level security;
 alter table public.bookings enable row level security;
 
@@ -171,6 +201,21 @@ on public.facility_items
 for select
 to authenticated, anon
 using (true);
+
+drop policy if exists "public_read_faq_items" on public.faq_items;
+create policy "public_read_faq_items"
+on public.faq_items
+for select
+to authenticated, anon
+using (true);
+
+drop policy if exists "admin_manage_faq_items" on public.faq_items;
+create policy "admin_manage_faq_items"
+on public.faq_items
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "public_read_schedule_slots" on public.schedule_slots;
 create policy "public_read_schedule_slots"
@@ -231,6 +276,13 @@ values
   ('Mushola', 'Ruang ibadah yang tenang dan bersih untuk pengunjung.', 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=1400&q=80', 4, false),
   ('Kantin Kinetic', 'Minuman, kopi, dan camilan tersedia untuk pemain dan penonton.', 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=80', 5, false);
 
+delete from public.faq_items;
+insert into public.faq_items (question, answer, sort_order)
+values
+  ('Apakah bisa reschedule jadwal?', 'Bisa. Admin akan memindahkan booking ke slot kosong setelah pembayaran diverifikasi.', 1),
+  ('Kapan status slot menjadi booked?', 'Status slot menjadi booked setelah admin menekan Konfirmasi dan pembayaran customer terverifikasi.', 2),
+  ('Apakah admin bisa menutup slot tertentu?', 'Bisa. Admin dapat menutup slot manual dari dashboard jadwal booking.', 3);
+
 with ranked_duplicates as (
   select
     id,
@@ -247,10 +299,33 @@ where id in (
   where row_num > 1
 );
 
+update public.schedule_slots as slots
+set status = case
+  when bookings.status = 'confirmed' and bookings.payment_status = 'terverifikasi' then 'booked'::public.slot_status
+  when bookings.status = 'pending' then 'pending'::public.slot_status
+  when bookings.status = 'cancelled' then 'available'::public.slot_status
+  else slots.status
+end,
+notes = case
+  when bookings.status = 'confirmed' and bookings.payment_status = 'terverifikasi' then 'Booking terkonfirmasi'
+  when bookings.status = 'pending' then 'Menunggu verifikasi admin'
+  when bookings.status = 'cancelled' then null
+  else slots.notes
+end
+from public.bookings
+where bookings.slot_id = slots.id;
+
 delete from public.schedule_slots
 where pitch_name = 'Lapangan Utama'
   and status = 'available'
-  and start_at >= date_trunc('day', now())
+  and not exists (
+    select 1
+    from public.bookings
+    where public.bookings.slot_id = public.schedule_slots.id
+  );
+
+delete from public.schedule_slots
+where status in ('booked', 'pending')
   and not exists (
     select 1
     from public.bookings
@@ -260,6 +335,9 @@ where pitch_name = 'Lapangan Utama'
 delete from public.bookings
 where admin_notes like 'Dummy booking seed %';
 
+delete from public.bookings
+where payment_code like 'KT-DEMO%';
+
 delete from public.schedule_slots
 where notes like 'Dummy seed %'
 and not exists (
@@ -267,186 +345,3 @@ and not exists (
   from public.bookings
   where public.bookings.slot_id = public.schedule_slots.id
 );
-
-with dummy_slots as (
-  select
-    'Lapangan Utama'::text as pitch_name,
-    (((current_date + 1)::text || ' 19:00:00+07')::timestamptz) as start_at,
-    (((current_date + 1)::text || ' 20:00:00+07')::timestamptz) as end_at,
-    450000::integer as price,
-    'booked'::public.slot_status as status,
-    'Dummy seed booking 1'::text as notes
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 1)::text || ' 21:00:00+07')::timestamptz),
-    (((current_date + 1)::text || ' 22:00:00+07')::timestamptz),
-    450000,
-    'booked'::public.slot_status,
-    'Dummy seed booking 2'
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 2)::text || ' 18:00:00+07')::timestamptz),
-    (((current_date + 2)::text || ' 19:00:00+07')::timestamptz),
-    450000,
-    'booked'::public.slot_status,
-    'Dummy seed booking 3'
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 2)::text || ' 20:00:00+07')::timestamptz),
-    (((current_date + 2)::text || ' 21:00:00+07')::timestamptz),
-    450000,
-    'booked'::public.slot_status,
-    'Dummy seed booking 4'
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 4)::text || ' 09:00:00+07')::timestamptz),
-    (((current_date + 4)::text || ' 10:00:00+07')::timestamptz),
-    350000,
-    'booked'::public.slot_status,
-    'Dummy seed booking 5'
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 3)::text || ' 10:00:00+07')::timestamptz),
-    (((current_date + 3)::text || ' 11:00:00+07')::timestamptz),
-    350000,
-    'blocked'::public.slot_status,
-    'Dummy seed blocked 1'
-  union all
-  select
-    'Lapangan Utama',
-    (((current_date + 5)::text || ' 17:00:00+07')::timestamptz),
-    (((current_date + 5)::text || ' 18:00:00+07')::timestamptz),
-    450000,
-    'blocked'::public.slot_status,
-    'Dummy seed blocked 2'
-),
-upserted_slots as (
-  insert into public.schedule_slots (pitch_name, start_at, end_at, price, status, notes)
-  select pitch_name, start_at, end_at, price, status, notes
-  from dummy_slots
-  on conflict (pitch_name, start_at, end_at) do update
-  set price = excluded.price,
-      status = excluded.status,
-      notes = excluded.notes
-  returning id, notes, price
-)
-insert into public.bookings (
-  slot_id,
-  team_name,
-  contact_name,
-  contact_phone,
-  address,
-  status,
-  payment_code,
-  payment_unique_number,
-  transfer_amount,
-  payment_method,
-  payment_status,
-  admin_notes
-)
-select
-  slots.id,
-  seeded.team_name,
-  seeded.contact_name,
-  seeded.contact_phone,
-  seeded.address,
-  seeded.status,
-  seeded.payment_code,
-  seeded.payment_unique_number,
-  slots.price + seeded.payment_unique_number,
-  'transfer_manual',
-  seeded.payment_status,
-  seeded.admin_notes
-from upserted_slots as slots
-join (
-  values
-    (
-      'Dummy seed booking 1'::text,
-      'Senja FC'::text,
-      'Raka Pratama'::text,
-      '081234567801'::text,
-      'Jl. Stadion Raya No. 12, Jakarta'::text,
-      'confirmed'::public.booking_status,
-      'KT-DEMO01'::text,
-      111::integer,
-      'terverifikasi'::public.payment_status,
-      'Dummy booking seed 1'::text
-    ),
-    (
-      'Dummy seed booking 2'::text,
-      'Orbit United'::text,
-      'Dimas Saputra'::text,
-      '081234567811'::text,
-      'Jl. Cendana Timur No. 18, Jakarta'::text,
-      'confirmed'::public.booking_status,
-      'KT-DEMO02'::text,
-      125::integer,
-      'terverifikasi'::public.payment_status,
-      'Dummy booking seed 2'::text
-    ),
-    (
-      'Dummy seed booking 3'::text,
-      'Metro Futsal Club'::text,
-      'Salsa Maharani'::text,
-      '081234567812'::text,
-      'Jl. Wijaya Kusuma No. 7, Jakarta'::text,
-      'pending'::public.booking_status,
-      'KT-DEMO03'::text,
-      222::integer,
-      'menunggu_verifikasi'::public.payment_status,
-      'Dummy booking seed 3'::text
-    ),
-    (
-      'Dummy seed booking 4'::text,
-      'Garuda Malam'::text,
-      'Nadia Putri'::text,
-      '081234567802'::text,
-      'Jl. Elang Selatan No. 8, Jakarta'::text,
-      'confirmed'::public.booking_status,
-      'KT-DEMO04'::text,
-      310::integer,
-      'terverifikasi'::public.payment_status,
-      'Dummy booking seed 4'::text
-    ),
-    (
-      'Dummy seed booking 5'::text,
-      'Bintang Timur'::text,
-      'Yoga Prasetyo'::text,
-      '081234567813'::text,
-      'Jl. Anggrek Barat No. 4, Jakarta'::text,
-      'cancelled'::public.booking_status,
-      'KT-DEMO05'::text,
-      155::integer,
-      'ditolak'::public.payment_status,
-      'Dummy booking seed 5'::text
-    )
-) as seeded (
-  slot_notes,
-  team_name,
-  contact_name,
-  contact_phone,
-  address,
-  status,
-  payment_code,
-  payment_unique_number,
-  payment_status,
-  admin_notes
-)
-  on slots.notes = seeded.slot_notes
-on conflict (slot_id) do update
-set team_name = excluded.team_name,
-    contact_name = excluded.contact_name,
-    contact_phone = excluded.contact_phone,
-    address = excluded.address,
-    status = excluded.status,
-    payment_code = excluded.payment_code,
-    payment_unique_number = excluded.payment_unique_number,
-    transfer_amount = excluded.transfer_amount,
-    payment_method = excluded.payment_method,
-    payment_status = excluded.payment_status,
-    admin_notes = excluded.admin_notes;

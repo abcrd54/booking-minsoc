@@ -7,14 +7,16 @@ import {
 } from "lucide-react";
 
 import { LandingNav } from "@/components/landing-nav";
-import { BookingCalendarVirtual } from "@/components/booking-calendar-virtual";
+import { BookingCalendarLive } from "@/components/booking-calendar-live";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   fallbackFacilityItems,
+  fallbackFaqItems,
   fallbackGalleryItems,
   fallbackSettings,
   type BookingSettings,
+  type FaqItem,
   type FacilityItem,
   type GalleryItem,
   type ScheduleSlotView,
@@ -47,24 +49,6 @@ const testimonials = [
   },
 ];
 
-const faqs = [
-  {
-    question: "Apakah bisa reschedule jadwal?",
-    answer:
-      "Ya, reschedule dapat dilakukan maksimal 24 jam sebelum jadwal main dengan menghubungi admin via WhatsApp.",
-  },
-  {
-    question: "Apakah harga sudah termasuk sewa bola?",
-    answer:
-      "Setiap booking lapangan sudah mendapatkan peminjaman 2 bola standar FIFA dan 1 set rompi (bibs).",
-  },
-  {
-    question: "Berapa kapasitas pemain per tim?",
-    answer:
-      "Lapangan kami didesain untuk format 7vs7 atau 8vs8 untuk kenyamanan maksimal.",
-  },
-];
-
 const navItems = [
   { label: "Home", href: "#home" },
   { label: "Venue", href: "#facilities" },
@@ -81,15 +65,16 @@ async function getBookingCalendarData() {
       slots: [],
       galleryItems: fallbackGalleryItems,
       facilityItems: fallbackFacilityItems,
+      faqItems: fallbackFaqItems,
     };
   }
 
   try {
     const supabase = await createSupabaseServerClient();
-    const [settingsResult, slotsResult, bookingsResult, galleryResult, facilitiesResult] = await Promise.all([
+    const [settingsResult, slotsResult, galleryResult, facilitiesResult, faqResult] = await Promise.all([
       supabase
         .from("app_settings")
-        .select("venue_name, open_time, close_time, maps_coordinates, contact_phone, default_price, prime_start_time, prime_end_time, prime_price, slot_interval_minutes")
+        .select("venue_name, open_time, close_time, maps_coordinates, contact_phone, default_price, prime_start_time, prime_end_time, prime_price, slot_interval_minutes, site_logo_url, favicon_url, seo_title, seo_description, seo_keywords, google_analytics_id")
         .eq("id", 1)
         .maybeSingle(),
       supabase
@@ -98,16 +83,12 @@ async function getBookingCalendarData() {
         .gte("start_at", new Date().toISOString())
         .order("start_at", { ascending: true })
         .limit(5000),
-      supabase
-        .from("bookings")
-        .select("slot_id, status, payment_status")
-        .order("created_at", { ascending: false })
-        .limit(5000),
       supabase.from("site_gallery").select("id, title, image_url, sort_order").order("sort_order", { ascending: true }),
       supabase
         .from("facility_items")
         .select("id, title, description, image_url, sort_order, is_featured")
         .order("sort_order", { ascending: true }),
+      supabase.from("faq_items").select("id, question, answer, sort_order").order("sort_order", { ascending: true }),
     ]);
 
     const settings: BookingSettings =
@@ -123,14 +104,14 @@ async function getBookingCalendarData() {
             primeEndTime: settingsResult.data.prime_end_time,
             primePrice: settingsResult.data.prime_price,
             slotIntervalMinutes: settingsResult.data.slot_interval_minutes,
+            siteLogoUrl: settingsResult.data.site_logo_url,
+            faviconUrl: settingsResult.data.favicon_url,
+            seoTitle: settingsResult.data.seo_title,
+            seoDescription: settingsResult.data.seo_description,
+            seoKeywords: settingsResult.data.seo_keywords,
+            googleAnalyticsId: settingsResult.data.google_analytics_id,
           }
         : fallbackSettings;
-
-    const bookedSlotIds = new Set(
-      (bookingsResult.data ?? [])
-        .map((booking) => booking.slot_id)
-        .filter((slotId): slotId is string => Boolean(slotId)),
-    );
 
     const slots: ScheduleSlotView[] =
       slotsResult.data?.map((slot) => ({
@@ -139,7 +120,7 @@ async function getBookingCalendarData() {
         startAt: slot.start_at,
         endAt: slot.end_at,
         price: slot.price,
-        status: bookedSlotIds.has(slot.id) ? "booked" : slot.status,
+        status: slot.status,
         notes: slot.notes,
       })) ?? [];
 
@@ -161,11 +142,20 @@ async function getBookingCalendarData() {
         isFeatured: item.is_featured,
       })) ?? [];
 
+    const faqItems: FaqItem[] =
+      faqResult.data?.map((item) => ({
+        id: item.id,
+        question: item.question,
+        answer: item.answer,
+        sortOrder: item.sort_order,
+      })) ?? fallbackFaqItems;
+
     return {
       settings,
       slots,
       galleryItems,
       facilityItems,
+      faqItems,
     };
   } catch {
     return {
@@ -173,6 +163,7 @@ async function getBookingCalendarData() {
       slots: [],
       galleryItems: fallbackGalleryItems,
       facilityItems: fallbackFacilityItems,
+      faqItems: fallbackFaqItems,
     };
   }
 }
@@ -189,7 +180,11 @@ export default async function HomePage() {
 
   return (
     <main className="overflow-x-hidden bg-pitch-950 text-foreground">
-      <LandingNav brandName={bookingCalendarData.settings.venueName} items={navItems} />
+      <LandingNav
+        brandName={bookingCalendarData.settings.venueName}
+        brandLogoUrl={bookingCalendarData.settings.siteLogoUrl}
+        items={navItems}
+      />
 
       <section
         id="home"
@@ -296,7 +291,7 @@ export default async function HomePage() {
             </h2>
             <p className="mt-4 text-mist-300">Pilih tanggal, tentukan jam main, lalu lanjutkan booking.</p>
           </div>
-          <BookingCalendarVirtual settings={bookingCalendarData.settings} slots={bookingCalendarData.slots} />
+          <BookingCalendarLive settings={bookingCalendarData.settings} slots={bookingCalendarData.slots} />
         </div>
       </section>
 
@@ -402,9 +397,9 @@ export default async function HomePage() {
             Pertanyaan Umum
           </h2>
           <div className="space-y-4">
-            {faqs.map((faq, index) => (
+            {bookingCalendarData.faqItems.map((faq, index) => (
               <details
-                key={faq.question}
+                key={faq.id}
                 className="surface-glow group overflow-hidden border-b border-mist-700/20 bg-pitch-800"
                 open={index === 0}
               >
@@ -514,7 +509,7 @@ export default async function HomePage() {
               {bookingCalendarData.settings.venueName.toUpperCase()}
             </Link>
             <div className="mt-4 text-xs uppercase tracking-[0.3em] text-mist-300/70">
-              Hak cipta 2026 Kinetic Turf. Seluruh hak dilindungi.
+              Hak cipta 2026 {bookingCalendarData.settings.venueName}. Seluruh hak dilindungi.
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-6 text-xs uppercase tracking-[0.3em] text-mist-300/80">

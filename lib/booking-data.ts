@@ -4,7 +4,7 @@ export type ScheduleSlotView = {
   startAt: string;
   endAt: string;
   price: number;
-  status: "available" | "booked" | "blocked";
+  status: "available" | "pending" | "booked" | "blocked";
   notes?: string | null;
 };
 
@@ -19,6 +19,12 @@ export type BookingSettings = {
   primeEndTime: string;
   primePrice: number;
   slotIntervalMinutes: number;
+  siteLogoUrl?: string | null;
+  faviconUrl?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
+  googleAnalyticsId?: string | null;
 };
 
 export type GalleryItem = {
@@ -37,6 +43,13 @@ export type FacilityItem = {
   isFeatured?: boolean;
 };
 
+export type FaqItem = {
+  id: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+};
+
 export const fallbackSettings: BookingSettings = {
   venueName: "Kinetic Turf",
   openTime: "09:00",
@@ -48,6 +61,12 @@ export const fallbackSettings: BookingSettings = {
   primeEndTime: "22:00",
   primePrice: 450000,
   slotIntervalMinutes: 60,
+  siteLogoUrl: null,
+  faviconUrl: null,
+  seoTitle: "Kinetic Turf",
+  seoDescription: "Booking lapangan mini soccer premium dengan jadwal yang mudah dan cepat.",
+  seoKeywords: "booking lapangan, mini soccer, sewa lapangan, futsal, kinetic turf",
+  googleAnalyticsId: null,
 };
 
 export const fallbackGalleryItems: GalleryItem[] = [
@@ -126,70 +145,23 @@ export const fallbackFacilityItems: FacilityItem[] = [
   },
 ];
 
-export const fallbackScheduleSlots: ScheduleSlotView[] = [
+export const fallbackFaqItems: FaqItem[] = [
   {
-    id: "slot-2026-04-15-09",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-15T09:00:00+07:00",
-    endAt: "2026-04-15T10:00:00+07:00",
-    price: 350000,
-    status: "available",
+    id: "faq-1",
+    question: "Apakah bisa reschedule jadwal?",
+    answer: "Ya, admin bisa memindahkan booking sesuai slot kosong yang tersedia setelah pembayaran Midtrans berhasil dan booking dikonfirmasi.",
+    sortOrder: 1,
   },
   {
-    id: "slot-2026-04-15-10",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-15T10:00:00+07:00",
-    endAt: "2026-04-15T11:00:00+07:00",
-    price: 350000,
-    status: "booked",
+    id: "faq-2",
+    question: "Apakah harga sudah termasuk sewa bola?",
+    answer: "Harga booking sudah termasuk bola standar pertandingan dan rompi latihan.",
+    sortOrder: 2,
   },
   {
-    id: "slot-2026-04-15-19",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-15T19:00:00+07:00",
-    endAt: "2026-04-15T20:00:00+07:00",
-    price: 500000,
-    status: "available",
-  },
-  {
-    id: "slot-2026-04-15-20",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-15T20:00:00+07:00",
-    endAt: "2026-04-15T21:00:00+07:00",
-    price: 500000,
-    status: "booked",
-  },
-  {
-    id: "slot-2026-04-16-09",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-16T09:00:00+07:00",
-    endAt: "2026-04-16T10:00:00+07:00",
-    price: 350000,
-    status: "available",
-  },
-  {
-    id: "slot-2026-04-16-18",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-16T18:00:00+07:00",
-    endAt: "2026-04-16T19:00:00+07:00",
-    price: 500000,
-    status: "blocked",
-    notes: "Turnamen internal",
-  },
-  {
-    id: "slot-2026-04-17-21",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-17T21:00:00+07:00",
-    endAt: "2026-04-17T22:00:00+07:00",
-    price: 500000,
-    status: "available",
-  },
-  {
-    id: "slot-2026-04-18-22",
-    pitchName: "Lapangan Utama",
-    startAt: "2026-04-18T22:00:00+07:00",
-    endAt: "2026-04-18T23:00:00+07:00",
-    price: 500000,
-    status: "available",
+    id: "faq-3",
+    question: "Bagaimana alur konfirmasi booking?",
+    answer: "Customer membayar lewat Midtrans Snap, status pembayaran diperbarui otomatis, lalu admin mengonfirmasi booking di dashboard.",
+    sortOrder: 3,
   },
 ];

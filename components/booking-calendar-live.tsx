@@ -97,7 +97,11 @@ function getCalendarCells(monthDate: Date) {
   });
 }
 
-export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps) {
+function getSlotHourInJakarta(value: string) {
+  return new Date(value).getUTCHours() + 7;
+}
+
+export function BookingCalendarLive({ settings, slots }: BookingCalendarProps) {
   const todayDayKey = useMemo(() => formatDayKey(new Date().toISOString()), []);
   const [selectedDay, setSelectedDay] = useState(todayDayKey);
   const [selectedSlotId, setSelectedSlotId] = useState("");
@@ -192,20 +196,20 @@ export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
-  const morningSlots = visibleSlots.filter((slot) => new Date(slot.startAt).getUTCHours() + 7 < 12);
+  const morningSlots = visibleSlots.filter((slot) => getSlotHourInJakarta(slot.startAt) < 12);
   const afternoonSlots = visibleSlots.filter((slot) => {
-    const hour = new Date(slot.startAt).getUTCHours() + 7;
+    const hour = getSlotHourInJakarta(slot.startAt);
     return hour >= 12 && hour < 17;
   });
   const primeSlots = visibleSlots.filter((slot) => {
-    const hour = new Date(slot.startAt).getUTCHours() + 7;
+    const hour = getSlotHourInJakarta(slot.startAt);
     return hour >= 17 && hour < 22;
   });
-  const lateNightSlots = visibleSlots.filter((slot) => new Date(slot.startAt).getUTCHours() + 7 >= 22);
+  const lateNightSlots = visibleSlots.filter((slot) => getSlotHourInJakarta(slot.startAt) >= 22);
 
   const selectedDayLabel = formatFullDayLabelFromDayKey(selectedDay);
   const selectedSlotLabel = selectedSlot
-    ? `${selectedDayLabel} • ${formatTime(selectedSlot.startAt)} - ${formatTime(selectedSlot.endAt)}`
+    ? `${selectedDayLabel} | ${formatTime(selectedSlot.startAt)} - ${formatTime(selectedSlot.endAt)}`
     : "";
 
   const renderSlotCard = (slot: ScheduleSlotView, selected = false) => (
@@ -220,12 +224,18 @@ export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps
           slot.status === "available" &&
           "border-transparent bg-lime-300 text-lime-700 shadow-[0_0_20px_rgba(197,254,0,0.18)]",
         !selected && slot.status === "available" && "border-mist-700/10 bg-pitch-950 hover:bg-pitch-700",
+        !selected && slot.status === "pending" && "cursor-not-allowed border-transparent bg-amber-300/10",
         !selected && slot.status === "booked" && "cursor-not-allowed border-transparent bg-pitch-750/40",
         !selected && slot.status === "blocked" && "border-transparent bg-red-400/10",
       )}
     >
       {selected && slot.status === "available" ? (
         <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.24em]">Dipilih</span>
+      ) : null}
+      {slot.status === "pending" ? (
+        <span className="absolute right-3 top-3 rounded-full border border-amber-300/20 bg-amber-400 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-pitch-950">
+          Pending
+        </span>
       ) : null}
       {slot.status === "booked" ? (
         <span className="absolute right-3 top-3 rounded-full border border-red-300/20 bg-red-400 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white">
@@ -237,10 +247,32 @@ export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps
           Ditutup
         </span>
       ) : null}
-      <span className={cn("mb-1 block pr-16 text-[10px] font-bold uppercase", selected && slot.status === "available" ? "text-lime-700" : slot.status === "available" ? "text-mist-300" : "text-mist-300/50 line-through")}>
+      <span
+        className={cn(
+          "mb-1 block pr-16 text-[10px] font-bold uppercase",
+          selected && slot.status === "available"
+            ? "text-lime-700"
+            : slot.status === "available"
+              ? "text-mist-300"
+              : slot.status === "pending"
+                ? "text-amber-100/80"
+                : "text-mist-300/50 line-through",
+        )}
+      >
         {formatTime(slot.startAt)} - {formatTime(slot.endAt)}
       </span>
-      <span className={cn("block pr-16 font-headline text-lg font-bold", selected && slot.status === "available" ? "text-lime-700" : slot.status === "available" ? "text-foreground" : "text-mist-300/50 line-through")}>
+      <span
+        className={cn(
+          "block pr-16 font-headline text-lg font-bold",
+          selected && slot.status === "available"
+            ? "text-lime-700"
+            : slot.status === "available"
+              ? "text-foreground"
+              : slot.status === "pending"
+                ? "text-amber-100"
+                : "text-mist-300/50 line-through",
+        )}
+      >
         Rp {slot.price.toLocaleString("id-ID")}
       </span>
     </button>
@@ -330,7 +362,7 @@ export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps
             </div>
 
             <div className="rounded-xl border border-dashed border-mist-700/20 bg-pitch-900 px-4 py-4 text-sm text-mist-300">
-              Semua tanggal mulai hari ini ke depan otomatis kosong. Slot hanya berubah jika sudah dibooking atau diblok admin.
+              Semua tanggal mulai hari ini ke depan otomatis kosong. Slot akan berubah menjadi pending saat customer mengirim booking, lalu menjadi booked setelah pembayaran terverifikasi dan admin mengonfirmasi.
             </div>
           </CardContent>
         </Card>
@@ -423,7 +455,7 @@ export function BookingCalendarVirtual({ settings, slots }: BookingCalendarProps
               </div>
 
               <div className="rounded-xl border border-lime-300/15 bg-lime-300/10 px-4 py-4 text-sm leading-7 text-mist-100">
-                Setelah submit, sistem membuat kode pembayaran unik. Pembayaran dilakukan lewat transfer internal dan diverifikasi sistem tanpa pihak ketiga.
+                Setelah submit, sistem akan membuka Midtrans Snap agar customer bisa langsung memilih metode pembayaran.
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
