@@ -29,17 +29,7 @@ function getAppBaseUrl() {
 }
 
 export function isFonnteConfigured() {
-  return Boolean(getFonnteToken() && getAppBaseUrl());
-}
-
-export function buildPaymentUrl(bookingId: string) {
-  const baseUrl = getAppBaseUrl();
-
-  if (!baseUrl) {
-    throw new Error("Missing APP_BASE_URL or VERCEL_URL for payment link generation.");
-  }
-
-  return `${baseUrl}/pembayaran?booking=${encodeURIComponent(bookingId)}`;
+  return Boolean(getFonnteToken());
 }
 
 export function normalizePhoneForWhatsApp(phone: string) {
@@ -74,7 +64,6 @@ export async function sendPaymentLinkWhatsApp(input: {
     throw new Error("Missing FONNTE_TOKEN.");
   }
 
-  const paymentUrl = buildPaymentUrl(input.bookingId);
   const normalizedPhone = normalizePhoneForWhatsApp(input.contactPhone);
 
   if (!normalizedPhone) {
@@ -86,14 +75,13 @@ export async function sendPaymentLinkWhatsApp(input: {
     message: [
       `Halo ${input.contactName},`,
       "",
-      "Booking lapangan Anda sudah dibuat.",
-      `Order ID: ${input.orderId}`,
-      `Jadwal: ${input.slotLabel}`,
-      `Nominal: Rp ${input.amount.toLocaleString("id-ID")}`,
-      `Batas pembayaran: ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit sejak link dibuat.`,
+      "Booking berhasil dibuat.",
+      `Kode booking: ${input.orderId}`,
+      `Detail booking: ${input.slotLabel}`,
+      `Total pembayaran: Rp ${input.amount.toLocaleString("id-ID")}`,
+      `Batas pembayaran: ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit.`,
       "",
-      "Link pembayaran:",
-      paymentUrl,
+      "Silakan lanjutkan pembayaran dari halaman website menggunakan kode booking tersebut.",
     ].join("\n"),
     countryCode: "62",
     preview: "false",

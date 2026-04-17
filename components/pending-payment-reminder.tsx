@@ -184,7 +184,7 @@ export function PendingPaymentReminder() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href={`/pembayaran?booking=${encodeURIComponent(reminder.bookingId)}`}
-              className={cn(buttonVariants(), "w-full")}
+              className={cn(buttonVariants(), "w-full whitespace-normal px-4 text-center text-[11px] tracking-[0.14em] sm:text-sm sm:tracking-[0.22em]")}
             >
               <CreditCard className="h-4 w-4" />
               Bayar Sekarang
@@ -193,7 +193,7 @@ export function PendingPaymentReminder() {
               type="button"
               onClick={() => void handleCancel()}
               disabled={isCancelling}
-              className={cn(buttonVariants({ variant: "secondary" }), "w-full")}
+              className={cn(buttonVariants({ variant: "secondary" }), "w-full whitespace-normal px-4 text-center text-[11px] tracking-[0.14em] sm:text-sm sm:tracking-[0.22em]")}
             >
               {isCancelling ? "Membatalkan..." : "Batalkan Booking"}
             </button>

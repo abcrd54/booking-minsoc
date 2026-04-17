@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Montserrat } from "next/font/google";
 import { CalendarClock, CircleDollarSign, ImagePlus, LayoutDashboard, ListChecks, LogOut, MapPinned, Phone, ShieldCheck, UserRound } from "lucide-react";
 
 import { requireAdmin } from "@/lib/auth";
@@ -30,6 +31,11 @@ import {
 import { logoutAction } from "../login/actions";
 
 export const dynamic = "force-dynamic";
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-montserrat-admin",
+});
 
 type AdminPageProps = {
   searchParams: Promise<{
@@ -237,7 +243,7 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
   ];
 
   return (
-    <main className="min-h-screen bg-pitch-950 text-foreground">
+    <main className={`${montserrat.className} min-h-screen bg-pitch-950 text-foreground`}>
       <div className="mx-auto min-h-screen max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
         <aside className="surface-glow rounded-2xl border border-mist-700/20 bg-pitch-900 p-6 lg:fixed lg:left-8 lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-[280px]">
           <div className="flex items-center justify-between">
