@@ -81,7 +81,6 @@ export async function GET(request: Request) {
     .select("id, payment_code, contact_name, transfer_amount, payment_status, status, updated_at, payment_method, schedule_slots(start_at, end_at)")
     .eq("id", bookingId)
     .eq("payment_code", orderId)
-    .eq("payment_method", "midtrans_snap")
     .maybeSingle();
 
   if (!booking) {
@@ -95,7 +94,6 @@ export async function GET(request: Request) {
       .select("id, payment_code, contact_name, transfer_amount, payment_status, status, updated_at, payment_method, schedule_slots(start_at, end_at)")
       .eq("id", bookingId)
       .eq("payment_code", orderId)
-      .eq("payment_method", "midtrans_snap")
       .maybeSingle();
 
     booking = refreshed.data ?? booking;

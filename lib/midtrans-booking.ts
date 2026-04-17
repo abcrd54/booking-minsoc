@@ -200,7 +200,6 @@ export async function cancelPendingMidtransBooking(bookingId: string, orderId: s
     .select("id, slot_id, status, payment_status, payment_method, payment_code")
     .eq("id", bookingId)
     .eq("payment_code", orderId)
-    .eq("payment_method", "midtrans_snap")
     .maybeSingle();
 
   if (error || !booking) {
@@ -246,7 +245,6 @@ export async function syncPendingMidtransBookings() {
   const { data: pendingBookings } = await supabase
     .from("bookings")
     .select("payment_code")
-    .eq("payment_method", "midtrans_snap")
     .in("status", ["pending", "confirmed"]);
 
   if (!pendingBookings?.length) {
@@ -272,7 +270,6 @@ export async function expireStalePendingMidtransBookings() {
   const { data: staleBookings } = await supabase
     .from("bookings")
     .select("id, slot_id, payment_code")
-    .eq("payment_method", "midtrans_snap")
     .eq("status", "pending")
     .eq("payment_status", "menunggu_verifikasi")
     .lte("created_at", getPendingTimeoutThreshold());
@@ -304,7 +301,6 @@ export async function expirePendingMidtransBooking(bookingId: string, orderId: s
     .select("id, slot_id, payment_code, status, payment_status")
     .eq("id", bookingId)
     .eq("payment_code", orderId)
-    .eq("payment_method", "midtrans_snap")
     .maybeSingle();
 
   if (error || !booking) {
