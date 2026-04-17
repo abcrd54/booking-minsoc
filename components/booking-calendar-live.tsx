@@ -461,7 +461,7 @@ export function BookingCalendarLive({ settings, slots }: BookingCalendarProps) {
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={() => setIsModalOpen(false)} className={cn(buttonVariants({ variant: "secondary" }), "w-full")}>Batal</button>
-                <SubmitButton className="w-full" pendingText="Membuat booking...">Lanjut ke Pembayaran</SubmitButton>
+                <SubmitButton className="w-full" pendingText="Membuat booking...">Bayar Sekarang</SubmitButton>
               </div>
             </form>
           </div>

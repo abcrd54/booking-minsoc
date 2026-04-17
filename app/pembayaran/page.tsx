@@ -50,7 +50,7 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
     .eq("id", bookingId)
     .maybeSingle();
 
-  if (booking?.payment_code && booking.payment_method === "midtrans_snap") {
+  if (booking?.payment_code) {
     try {
       await syncBookingFromMidtrans(booking.payment_code);
       const refreshed = await supabase
@@ -213,11 +213,15 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
                 />
               )}
 
-              {booking.payment_token && booking.status === "pending" && booking.payment_status === "menunggu_verifikasi" ? (
+              {!isPaidSuccess && booking.payment_token && booking.status === "pending" && booking.payment_status === "menunggu_verifikasi" ? (
                 <MidtransSnapClient bookingId={booking.id} clientKey={clientKey} snapToken={booking.payment_token} isProduction={isProduction} />
               ) : booking.payment_status === "kedaluwarsa" || booking.status === "cancelled" ? (
                 <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-100">
                   Waktu pembayaran sudah lewat {MIDTRANS_PENDING_TIMEOUT_MINUTES} menit. Booking ini dianggap gagal dan slot sudah tersedia kembali.
+                </div>
+              ) : isPaidSuccess || (booking.status === "confirmed" && booking.payment_status === "terverifikasi") ? (
+                <div className="rounded-xl border border-lime-300/20 bg-lime-300/10 px-4 py-4 text-sm text-lime-100">
+                  Pembayaran berhasil. Silakan kembali ke beranda.
                 </div>
               ) : (
                 <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-100">

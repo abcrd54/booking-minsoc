@@ -57,8 +57,8 @@ export function MidtransSnapClient({ bookingId, clientKey, snapToken, isProducti
             window.snap.pay(snapToken, {
               onSuccess: () => {
                 setIsOpening(false);
-                setMessage("Pembayaran berhasil. Mengarahkan kembali ke halaman booking...");
-                router.replace(`/pembayaran?booking=${encodeURIComponent(bookingId)}&paid=success`);
+                setMessage("Pembayaran berhasil. Mengarahkan ke beranda...");
+                router.replace(`/?success=${encodeURIComponent("pembayaran_berhasil")}`);
               },
               onPending: () => {
                 setIsOpening(false);
@@ -82,7 +82,7 @@ export function MidtransSnapClient({ bookingId, clientKey, snapToken, isProducti
               Membuka Snap...
             </>
           ) : (
-            "Bayar dengan Midtrans"
+            "Bayar Sekarang"
           )}
         </button>
         <div className="rounded-xl border border-mist-700/20 bg-pitch-950 px-4 py-4 text-sm leading-7 text-mist-300">

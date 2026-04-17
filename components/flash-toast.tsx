@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ type FlashToastState =
   | null;
 
 export function FlashToast() {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<FlashToastState>(null);
@@ -40,6 +41,25 @@ export function FlashToast() {
 
     setToast(null);
   }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+
+    if (!success && !error) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("success");
+    nextParams.delete("error");
+
+    const nextQuery = nextParams.toString();
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const nextUrl = `${pathname}${nextQuery ? `?${nextQuery}` : ""}${hash}`;
+
+    router.replace(nextUrl, { scroll: false });
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     if (!toast) {
