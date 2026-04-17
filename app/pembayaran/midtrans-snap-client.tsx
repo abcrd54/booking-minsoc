@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
@@ -24,12 +25,14 @@ declare global {
 }
 
 type MidtransSnapClientProps = {
+  bookingId: string;
   clientKey: string;
   snapToken: string;
   isProduction: boolean;
 };
 
-export function MidtransSnapClient({ clientKey, snapToken, isProduction }: MidtransSnapClientProps) {
+export function MidtransSnapClient({ bookingId, clientKey, snapToken, isProduction }: MidtransSnapClientProps) {
+  const router = useRouter();
   const [message, setMessage] = useState("Klik tombol di bawah untuk membuka pembayaran Midtrans Snap.");
   const [isOpening, setIsOpening] = useState(false);
 
@@ -54,7 +57,8 @@ export function MidtransSnapClient({ clientKey, snapToken, isProduction }: Midtr
             window.snap.pay(snapToken, {
               onSuccess: () => {
                 setIsOpening(false);
-                setMessage("Pembayaran berhasil. Status booking akan diperbarui otomatis.");
+                setMessage("Pembayaran berhasil. Mengarahkan kembali ke halaman booking...");
+                router.replace(`/pembayaran?booking=${encodeURIComponent(bookingId)}&paid=success`);
               },
               onPending: () => {
                 setIsOpening(false);

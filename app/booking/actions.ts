@@ -207,6 +207,13 @@ export async function createBookingAction(formData: FormData) {
           });
         } catch (fonnteError) {
           console.error("Failed to send WhatsApp payment link via Fonnte:", fonnteError);
+
+          await supabase
+            .from("bookings")
+            .update({
+              admin_notes: `Fonnte gagal: ${fonnteError instanceof Error ? fonnteError.message : "unknown_error"}`,
+            })
+            .eq("id", booking.id);
         }
       }
 

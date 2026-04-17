@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 
 import { MidtransSnapClient } from "@/app/pembayaran/midtrans-snap-client";
 import { PaymentCountdown } from "@/app/pembayaran/payment-countdown";
@@ -14,12 +14,14 @@ import { cn } from "@/lib/utils";
 type PembayaranPageProps = {
   searchParams: Promise<{
     booking?: string;
+    paid?: string;
   }>;
 };
 
 export default async function PembayaranPage({ searchParams }: PembayaranPageProps) {
   const params = await searchParams;
   const bookingId = params.booking ?? "";
+  const isPaidSuccess = params.paid === "success";
 
   if (!bookingId) {
     return (
@@ -102,6 +104,17 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
       }).format(new Date(slot.end_at))
     : "-";
   const reminderSlotLabel = `${slotLabel} - ${endTime}`;
+  const isExpiredState = booking.payment_status === "kedaluwarsa" || booking.status === "cancelled";
+  const pageTitle = isPaidSuccess
+    ? "Pembayaran Berhasil"
+    : isExpiredState
+      ? "Pembayaran Gagal"
+      : "Selesaikan Pembayaran";
+  const pageDescription = isPaidSuccess
+    ? "Booking berhasil dibuat. Silakan kembali ke beranda sambil menunggu status pembayaran dikonfirmasi otomatis oleh Midtrans."
+    : isExpiredState
+      ? `Waktu pembayaran sudah lewat ${MIDTRANS_PENDING_TIMEOUT_MINUTES} menit. Booking dianggap gagal dan slot sudah tersedia kembali.`
+      : "Buka popup Midtrans Snap untuk memilih metode pembayaran. Status pembayaran akan diperbarui otomatis setelah Midtrans mengirim notifikasi.";
 
   return (
     <main className="min-h-screen bg-pitch-950 px-6 py-16 text-foreground">
@@ -122,10 +135,10 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
             Midtrans Snap
           </div>
           <h1 className="font-headline text-4xl font-black uppercase tracking-crushed md:text-6xl">
-            Selesaikan Pembayaran
+            {pageTitle}
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-mist-300">
-            Buka popup Midtrans Snap untuk memilih metode pembayaran. Status pembayaran akan diperbarui otomatis setelah Midtrans mengirim notifikasi.
+            {pageDescription}
           </p>
         </div>
 
@@ -165,7 +178,9 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
 
           <Card className="surface-glow border border-mist-700/20 bg-pitch-900">
             <CardContent className="space-y-6 p-8">
-              <div className="font-headline text-2xl font-black uppercase">Pembayaran Midtrans</div>
+              <div className="font-headline text-2xl font-black uppercase">
+                {isPaidSuccess ? "Status Booking" : isExpiredState ? "Pembayaran Ditutup" : "Pembayaran Midtrans"}
+              </div>
 
               <div className="space-y-3 text-sm leading-7 text-mist-300">
                 <p>1. Klik tombol pembayaran untuk membuka Midtrans Snap.</p>
@@ -174,16 +189,32 @@ export default async function PembayaranPage({ searchParams }: PembayaranPagePro
                 <p>4. Setelah pembayaran sukses, status booking akan diperbarui otomatis dari Midtrans.</p>
               </div>
 
-              <PaymentCountdown
-                bookingId={booking.id}
-                orderId={booking.payment_code ?? ""}
-                createdAt={booking.created_at}
-                isActive={booking.status === "pending" && booking.payment_status === "menunggu_verifikasi"}
-                timeoutMinutes={MIDTRANS_PENDING_TIMEOUT_MINUTES}
-              />
+              {isPaidSuccess ? (
+                <div className="rounded-xl border border-lime-300/20 bg-lime-300/10 px-4 py-4 text-sm text-lime-100">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-lime-300/12 text-lime-300">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black uppercase tracking-[0.22em] text-lime-300">Booking Berhasil</div>
+                      <div className="mt-2 leading-7">
+                        Booking berhasil, silakan kembali ke beranda. Status akan diperbarui otomatis setelah konfirmasi Midtrans masuk.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <PaymentCountdown
+                  bookingId={booking.id}
+                  orderId={booking.payment_code ?? ""}
+                  createdAt={booking.created_at}
+                  isActive={booking.status === "pending" && booking.payment_status === "menunggu_verifikasi"}
+                  timeoutMinutes={MIDTRANS_PENDING_TIMEOUT_MINUTES}
+                />
+              )}
 
               {booking.payment_token && booking.status === "pending" && booking.payment_status === "menunggu_verifikasi" ? (
-                <MidtransSnapClient clientKey={clientKey} snapToken={booking.payment_token} isProduction={isProduction} />
+                <MidtransSnapClient bookingId={booking.id} clientKey={clientKey} snapToken={booking.payment_token} isProduction={isProduction} />
               ) : booking.payment_status === "kedaluwarsa" || booking.status === "cancelled" ? (
                 <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-100">
                   Waktu pembayaran sudah lewat {MIDTRANS_PENDING_TIMEOUT_MINUTES} menit. Booking ini dianggap gagal dan slot sudah tersedia kembali.

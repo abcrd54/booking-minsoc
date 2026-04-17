@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarClock, CircleDollarSign, ImagePlus, LayoutDashboard, ListChecks, LogOut, MapPinned, Phone, ShieldCheck, UserRound } from "lucide-react";
 
 import { requireAdmin } from "@/lib/auth";
+import { AdminSectionNav } from "@/components/admin-section-nav";
 import { AdminBookingCalendar } from "@/components/admin-booking-calendar.new";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { syncPendingMidtransBookings } from "@/lib/midtrans-booking";
@@ -253,22 +254,7 @@ export default async function SiteDashboard({ searchParams }: AdminPageProps) {
             <LayoutDashboard className="h-6 w-6 text-lime-300" />
           </div>
 
-          <div className="mt-8 space-y-3">
-            {navItems.map((item) => (
-              <Link
-                key={item.id}
-                href={`/admin?section=${item.id}`}
-                className={cn(
-                  "block rounded-xl px-4 py-3 text-sm uppercase tracking-[0.22em] transition",
-                  activeSection === item.id
-                    ? "bg-lime-300/12 text-lime-300"
-                    : "text-mist-300 hover:bg-pitch-800 hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          <AdminSectionNav items={navItems} activeSection={activeSection} />
 
           <div className="mt-8 rounded-2xl border border-lime-300/15 bg-[linear-gradient(160deg,rgba(197,254,0,0.18),rgba(14,14,14,0.2))] p-5">
             <div className="text-xs uppercase tracking-[0.3em] text-lime-100/80">Masuk Sebagai</div>
