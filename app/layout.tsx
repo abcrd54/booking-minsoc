@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { FlashToast } from "@/components/flash-toast";
 import { GlobalNavigationProgress } from "@/components/global-navigation-progress";
 import { fallbackSettings } from "@/lib/booking-data";
+import { getSiteBaseUrl } from "@/lib/site-url";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -54,12 +55,19 @@ async function getSiteMetadata() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteMetadata();
-  const title = settings.seoTitle || settings.venueName;
-  const description = settings.seoDescription || fallbackSettings.seoDescription || "";
+  const baseUrl = getSiteBaseUrl();
+  const title = settings.seoTitle || `${settings.venueName} | Booking Lapangan Mini Soccer`;
+  const description =
+    settings.seoDescription ||
+    `${settings.venueName} adalah venue mini soccer yang bisa dibooking online dengan jadwal real-time, pembayaran cepat, dan informasi lokasi lengkap.`;
   const keywords = settings.seoKeywords?.split(",").map((item: string) => item.trim()).filter(Boolean) ?? [];
 
   return {
-    title,
+    metadataBase: new URL(baseUrl),
+    title: {
+      default: title,
+      template: `%s | ${settings.venueName}`,
+    },
     description,
     keywords,
     applicationName: settings.venueName,
@@ -75,12 +83,13 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     alternates: {
-      canonical: "/",
+      canonical: baseUrl,
     },
     openGraph: {
       title,
       description,
       siteName: settings.venueName,
+      url: baseUrl,
       locale: "id_ID",
       type: "website",
     },
@@ -125,13 +134,47 @@ export default function RootLayout({
 
 async function AnalyticsSlot() {
   const settings = await getSiteMetadata();
+  const baseUrl = getSiteBaseUrl();
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: settings.venueName,
+      url: baseUrl,
+      description:
+        settings.seoDescription ||
+        `${settings.venueName} adalah website booking lapangan mini soccer dengan jadwal dan pembayaran online.`,
+      inLanguage: "id-ID",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: settings.venueName,
+      url: baseUrl,
+      telephone: settings.contactPhone,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "SportsActivityLocation",
+      name: settings.venueName,
+      url: baseUrl,
+      telephone: settings.contactPhone,
+    },
+  ];
 
   if (!settings.googleAnalyticsId) {
-    return null;
+    return (
+      <Script id="seo-structured-data" type="application/ld+json" strategy="afterInteractive">
+        {JSON.stringify(structuredData)}
+      </Script>
+    );
   }
 
   return (
     <>
+      <Script id="seo-structured-data" type="application/ld+json" strategy="afterInteractive">
+        {JSON.stringify(structuredData)}
+      </Script>
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${settings.googleAnalyticsId}`}
         strategy="afterInteractive"
