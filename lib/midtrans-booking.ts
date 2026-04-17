@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getMidtransTransactionStatus, type MidtransStatusResponse, verifyMidtransSignature } from "@/lib/midtrans";
 
@@ -100,6 +102,13 @@ export async function applyMidtransStatusToBooking(payload: MidtransStatusRespon
             : null,
     })
     .eq("id", booking.slot_id);
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/pembayaran");
+  revalidatePath("/payment/finish");
+  revalidatePath("/payment/unfinish");
+  revalidatePath("/payment/error");
 }
 
 export async function syncBookingFromMidtrans(orderId: string) {

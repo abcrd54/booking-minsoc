@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { hasSupabaseEnv } from "@/lib/supabase/env";
@@ -154,6 +155,12 @@ export async function createBookingAction(formData: FormData) {
           redirect(`/?error=${encodeURIComponent(slotUpdateError.message)}#pricing`);
         }
       }
+
+      revalidatePath("/");
+      revalidatePath("/admin");
+      revalidatePath("/payment/finish");
+      revalidatePath("/payment/unfinish");
+      revalidatePath("/payment/error");
     } catch (midtransError) {
       await supabase.from("bookings").delete().eq("id", booking.id);
 
